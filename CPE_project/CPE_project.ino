@@ -1,11 +1,17 @@
 //CPE 301 - Project
 //Uses water, temperature, and humidity sensors to control motor and LCD screen
 //(Swamp Cooler Simulation)
-//Written By Theresa Belleza, Michael Chavez, and Susu Pelger, Fall 2020
+//Written by Susu Pelger, Fall 2020
 
 //LCD library
 #include <LiquidCrystal.h>
-LiquidCrystal lcd(23, 24, 25, 26, 27, 28); //initializes library
+LiquidCrystal lcd(23, 24, 25, 26, 27, 28); //initializes LCD
+
+//DHT library
+#include <DHT.h>
+#define DHTPIN A1 //digital pin A1
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE); //initializes DHT sensor
 
 //pointers for ADC
 volatile unsigned char *my_ADMUX = (unsigned char*) 0x7C;
@@ -18,16 +24,17 @@ volatile unsigned char *port_b = (unsigned char*) 0x25;
 volatile unsigned char *ddr_b = (unsigned char*) 0x24;
 volatile unsigned char *pin_b = (unsigned char*) 0x23;
 
-//pointers for the EEPROM registers to save data
-volatile unsigned int* EEPROM_ADDR_REG = (unsigned int*) 0x41; //eeprom address register
-volatile unsigned char* EEPROM_DATA_REG = (unsigned char*) 0x40; //eeprom data register
-volatile unsigned char* EEPROM_CNTRL_REG = (unsigned char*) 0x3F; //eeprom control regiser
-unsigned int address = 0x0025;    // random address to save counter to
+//adc vars
+int adc_id = 0;
+int Historyvalue = 0;
+char printBuffer[128];
 
 void setup()
 {
+    Serial.begin(9600);
     adc_init(); //sets up ADC
     lcd.begin(16, 2); //sets up LCD columns and rows
+    dht.begin(); //sets up dht sensor
     *ddr_b |= 0xF1; //sets PB0 and 4-7 outputs
     *port_b &= 0x0E; //sets LEDs and motor to low for now
 }
@@ -37,18 +44,37 @@ void loop()
     //interrupts should be used to obtain readings from the sensors
     //and switch between states
 
-    unsigned int adc_reading = adc_read(0); //for now gets reading from ADC
+    //dht sensor
+    float humid = dht.readHumidity(); //reads humidity
+    float temp = dht.readTemperature(true); //reads temp in F
+    if(isnan(humid) || isnan(temp))
+    {
+        Serial.println("no reading from DHT");
+        return;
+    }
+    
+    //water sensor
+    unsigned int adc_reading = adc_read(adc_id); //for now gets reading from ADC
+    if(((Historyvalue>=adc_reading) && ((Historyvalue - adc_reading) > 10)) || ((Historyvalue<adc_reading) && ((adc_reading - Historyvalue) > 10)))
+    {
+      sprintf(printBuffer,"ADC%d level is %d\n",adc_id, adc_reading);
+      Serial.print(printBuffer);
+      Historyvalue = adc_reading;
+    }
 
     *port_b |= 0x10; //used to cycle through LEDs to high, rn lights up red LED
 
     //LCD code
     lcd.setCursor (0,0); //row 1
-    lcd.print("Temperature: ");
-    lcd.print(millis() / 1000); //to be replaced with reading from DHT sensor
+    lcd.print("Temp: ");
+    lcd.print(temp); //prints temperature
+    lcd.print((char)223);
+    lcd.print("F");
     
     lcd.setCursor (0,1); //row 2
     lcd.print("Humidity: ");
-    lcd.print(millis() / 1000); //to be replaced with reading from DHT sensor
+    lcd.print(humid); //prints humidity
+    lcd.print("%");
 }
 
 //functions
