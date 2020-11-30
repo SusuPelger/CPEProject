@@ -1,6 +1,9 @@
+//DHT code for CPE 301
+//example taken from https://github.com/adafruit/DHT-sensor-library/tree/master/examples/DHTtester
+//Susu Pelger
 #include <DHT.h>
 
-#define DHTPIN A1 //digital pin
+#define DHTPIN A1 //digital pin A1
 #define DHTTYPE DHT11
 
 DHT dht(DHTPIN, DHTTYPE);

@@ -1,5 +1,13 @@
-//ADC code for CPE 301 project - this is for the water sensor so far, still need to implement DHT
+//ADC code for CPE 301 project - this is for the water sensor and DHT
+//prints to serial monitor, constant measuring
 //Susu Pelger
+
+#include <DHT.h> //library for DHT sensor
+
+#define DHTPIN A1 //digital pin A1
+#define DHTTYPE DHT11
+
+DHT dht(DHTPIN, DHTTYPE);
 
 //pointers for ADC
 volatile unsigned char *my_ADMUX = (unsigned char*) 0x7C;
@@ -7,7 +15,7 @@ volatile unsigned char *my_ADCSRB = (unsigned char*) 0x7B;
 volatile unsigned char *my_ADCSRA = (unsigned char*) 0x7A;
 volatile unsigned int *my_ADC_DATA = (unsigned int*) 0x78;
 
-int adc_id = 1;
+int adc_id = 0;
 int HistoryValue = 0;
 char printBuffer[128];
 
@@ -15,14 +23,25 @@ void setup()
 {
     adc_init(); //sets up ADC
     Serial.begin(9600);
+    dht.begin();
 }
 
 void loop()
 {
-    //unsigned int adc_reading_w = adc_read(0); //gets reading for water sensor
-    //Serial.print(adc_reading_w);
+    //delay(2000); //needed for DHT, not for water sensor
 
-    int value = analogRead(adc_id); // get adc value
+    float humid = dht.readHumidity(); //reads humidity
+    float temp = dht.readTemperature(true); //reads temp in F
+
+    if(isnan(humid) || isnan(temp))
+    {
+        Serial.println("no reading from DHT");
+        return;
+    }
+
+    Serial.println((String)"Humidity: " +humid+ "% Temperature: " +temp+ "°F");
+
+    unsigned int value = adc_read(0); //reading from pin A0, the water sensor
 
     if(((HistoryValue>=value) && ((HistoryValue - value) > 10)) || ((HistoryValue<value) && ((value - HistoryValue) > 10)))
     {
