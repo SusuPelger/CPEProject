@@ -62,7 +62,7 @@ void loop()
       Historyvalue = adc_reading;
     }
 
-    *port_b |= 0x10; //lights up red LED
+    idlestate();
 
     //LCD code
     lcd.setCursor (0,0); //row 1
@@ -115,13 +115,13 @@ unsigned int adc_read(unsigned char adc_channel)
 //base line code for states
 void disabledstate()
 {
-    //Yellow LED lit
+    *port_b |= 0x20; //lights up yellow LED
     //no monitoring of water
 }
 
 void idlestate()
 {
-    //Green LED lit
+    *port_b |= 0x40; //lights up green LED
     //monitor temp
         //when temp > threshold, go to runningstate
     //time stamp to record transition times
@@ -131,18 +131,23 @@ void idlestate()
 
 void errorstate ()
 {
-    //Red LED lit
-    //motor turned off - regardless of temp
+    *port_b |= 0x10; //lights up red LED
+    *port_b &= 0xFE; //turns fan motor off
     //monitor temp
     //monitor water level
         //transition to idlestate when water is at good level
     //error message displayed on LCD
+    lcd.setCursor (0,0); //row 1
+    lcd.print("ERROR: REFILL");
+   
+    lcd.setCursor (0,1); //row 2
+    lcd.print("WATER LEVEL");
 }
 
 void runningstate()
 {
-    //Blue LED lit
-    //motor on
+    *port_b |= 0x80; //lights up blue LED
+    *port_b |= 0x01; //turns fan motor on
     //monitor temp
         //transition to idlestate when temp < threshold
     //monitor water level
