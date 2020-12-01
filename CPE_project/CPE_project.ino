@@ -35,7 +35,7 @@ void setup()
     adc_init(); //sets up ADC
     lcd.begin(16, 2); //sets up LCD columns and rows
     dht.begin(); //sets up dht sensor
-    *ddr_b |= 0xF1; //sets PB0 and 4-7 outputs
+    *ddr_b |= 0xF1; //sets PB0 (motor) and 4-7 (LEDs) outputs
     *port_b &= 0x0E; //sets LEDs and motor to low for now
 }
 
@@ -62,7 +62,7 @@ void loop()
       Historyvalue = adc_reading;
     }
 
-    *port_b |= 0x10; //used to cycle through LEDs to high, rn lights up red LED
+    *port_b |= 0x10; //lights up red LED
 
     //LCD code
     lcd.setCursor (0,0); //row 1
@@ -78,6 +78,7 @@ void loop()
 }
 
 //functions
+//sets up registers for ADC
 void adc_init()
 {
     //setup A register
@@ -97,6 +98,7 @@ void adc_init()
     *my_ADMUX &= 0b11100000; //clear bits 0-4 to 0 - reset channel and gain bits
 }
 
+//reads Analog data
 unsigned int adc_read(unsigned char adc_channel)
 {
     *my_ADMUX &= 0b11100000; //clear channel selection bits MUX 4-0
@@ -108,4 +110,41 @@ unsigned int adc_read(unsigned char adc_channel)
     while ((*my_ADCSRA & 0x40) != 0); //wait for conversion to complete
 
     return *my_ADC_DATA; //return result in ADC data register
+}
+
+//base line code for states
+void disabledstate()
+{
+    //Yellow LED lit
+    //no monitoring of water
+}
+
+void idlestate()
+{
+    //Green LED lit
+    //monitor temp
+        //when temp > threshold, go to runningstate
+    //time stamp to record transition times
+    //monitor water level
+        //go to errorstate if too low
+}
+
+void errorstate ()
+{
+    //Red LED lit
+    //motor turned off - regardless of temp
+    //monitor temp
+    //monitor water level
+        //transition to idlestate when water is at good level
+    //error message displayed on LCD
+}
+
+void runningstate()
+{
+    //Blue LED lit
+    //motor on
+    //monitor temp
+        //transition to idlestate when temp < threshold
+    //monitor water level
+        //transition to errorstate when water level too low
 }
