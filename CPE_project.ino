@@ -1,5 +1,6 @@
 //CPE 301 - Project
 //Uses water, temperature, and humidity sensors to control motor and LCD screen
+//Buttons to control idle state and vent
 //(Swamp Cooler Simulation)
 //Written by Susu Pelger, Fall 2020
 
