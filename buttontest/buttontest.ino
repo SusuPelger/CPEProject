@@ -36,12 +36,15 @@ void loop() {
         *port_b &= 0xBF; //green LED off
 
         //turns servo
-        //sort of works, but motor keeps moving around if button pressed for long time
-        myservo.write(90*bpress);// move servos to center position -> 0°
-        bpress++;
-        if (bpress == 3)
+        for(volatile unsigned int i = 0; i < 1000; i++); //eliminates noise
+        if (*pin_b & 0x08)
         {
-            bpress = 0;
+            myservo.write(90*bpress);// move servos to center position -> 0°
+            bpress++;
+            if (bpress == 3)
+            {
+                bpress = 0;
+            }
         }
     }
     else //buttons not pressed
