@@ -1,8 +1,18 @@
 //CPE 301 - Project
 //Uses water, temperature, and humidity sensors to control motor and LCD screen
 //Buttons to control idle state and vent
-//(Swamp Cooler Simulation)
+//(Evaporation Cooler Simulation)
 //Written by Susu Pelger, Fall 2020
+
+
+
+//start creating if statements in loop to check for which state im in
+//add buttons
+//add servo motor
+//add time and date part - using DS1307
+
+
+
 
 //LCD library
 #include <LiquidCrystal.h>
