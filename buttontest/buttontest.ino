@@ -58,23 +58,28 @@ void loop() {
 
 void venton() //ISR function when vent button is pressed
 {
-    //for(volatile unsigned int i = 0; i < 1000; i++); //eliminates noise
-    //if (*pin_b & 0x08)
-    //{
+    unsigned int lastint = 0; //starting point
+    unsigned int newint = millis(); //records new point
+
+    if (newint - lastint > 200) //debounces!
+    {
         myservo.write(90*bpress);// moves servo by 90 degrees each vent button press
         bpress++;
         if (bpress == 3) //change to needed number later
         {
             bpress = 0; //servo/vent will move back to beginning next vent button press
         }
-    //}
+    }
+
 }
 
 void disabled() //ISR function when disabled button pressed
 {
-    disable = !disable;
+    unsigned int lastint = 0; //starting point
+    unsigned int newint = millis(); //records new point
 
-    //figure out debouncing code
-    //getticks
-    //getcount
+    if (newint - lastint > 200) //debounces!
+    {
+        disable = !disable;
+    }
 }
