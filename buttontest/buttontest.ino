@@ -10,11 +10,6 @@ volatile unsigned char *port_b = (unsigned char*) 0x25;
 volatile unsigned char *ddr_b = (unsigned char*) 0x24;
 volatile unsigned char *pin_b = (unsigned char*) 0x23;
 
-//pointers for port e - for disabled button
-volatile unsigned char *port_e = (unsigned char*) 0x2E;
-volatile unsigned char *ddr_e = (unsigned char*) 0x2D;
-volatile unsigned char *pin_e = (unsigned char*) 0x2C;
-
 unsigned int ventpin = 2; //pin vent button
 unsigned int dispin = 3; //pin disable button
 
@@ -29,8 +24,6 @@ void setup() {
     *port_b &= 0xF5; //sets PB1 and PB3 to low
     *ddr_b |= 0xF2; //sets LEDs as outputs
     *port_b &= 0x0F; //sets LEDs to low
-    *ddr_e &= 0xFD; //sets PE5 as input
-    *port_e &= 0xEF; //sets LEDs to low
 
     attachInterrupt(digitalPinToInterrupt(ventpin), venton, RISING); //pull-down resistor
     attachInterrupt(digitalPinToInterrupt(dispin), disabled, CHANGE); //pull-down resistor
@@ -44,8 +37,6 @@ void loop() {
         *port_b |= 0x20; //lights up yellow LED
         *port_b |= 0x80; //lights up blue LED
         *port_b &= 0x2F; //!yellow LED off 0b0010 1111
-        //while(!(*pin_e & 0x10));
-        //while(disable == true);
     }
     else
     {
