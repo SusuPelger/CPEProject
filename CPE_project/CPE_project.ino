@@ -7,22 +7,33 @@
 
 
 //start creating if statements in loop to check for which state im in
-//add buttons
-//add servo motor
 //add time and date part - using DS1307
-
 
 
 
 //LCD library
 #include <LiquidCrystal.h>
-LiquidCrystal lcd(23, 24, 25, 26, 27, 28); //initializes LCD
+LiquidCrystal lcd(23, 24, 25, 26, 27, 28); //(RS, E, D4, D5, D6, D7) initializes LCD screen
 
 //DHT library
 #include <DHT.h>
 #define DHTPIN A1 //digital pin A1
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE); //initializes DHT sensor
+
+//DHT variables
+float humid = 0;
+float temp = 0;
+
+//Servo library
+#include <Servo.h>
+Servo myservo; //sets up servo
+unsigned int bpress = 1;
+
+//interrupt variables
+unsigned int ventpin = 2; //pin vent button
+unsigned int dispin = 3; //pin disable button
+bool disable = false;
 
 //pointers for ADC
 volatile unsigned char *my_ADMUX = (unsigned char*) 0x7C;
@@ -39,6 +50,7 @@ volatile unsigned char *pin_b = (unsigned char*) 0x23;
 int adc_id = 0;
 int Historyvalue = 0;
 char printBuffer[128];
+unsigned int adc_reading = 0;
 
 void setup()
 {
@@ -48,44 +60,55 @@ void setup()
     dht.begin(); //sets up dht sensor
     *ddr_b |= 0xF1; //sets PB0 (motor) and 4-7 (LEDs) outputs
     *port_b &= 0x0E; //sets LEDs and motor to low for now
+
+    myservo.attach(51); //servo connected to pin 51
+    myservo.write(0); //servo set at 0°
+    *ddr_b &= 0xFD; //sets PB1 (enable button) and PB3 (vent button) to input
+    *port_b &= 0xF5; //sets PB1 and PB3 to low
+
+    attachInterrupt(digitalPinToInterrupt(ventpin), venton, RISING); //pull-down resistor
+    attachInterrupt(digitalPinToInterrupt(dispin), disabled, CHANGE); //pull-down resistor
 }
 
 void loop()
 {
-    //interrupts should be used to obtain readings from the sensors
-    //and switch between states
-
-    //dht sensor
-    float humid = dht.readHumidity(); //reads humidity
-    float temp = dht.readTemperature(true); //reads temp in F
-    if(isnan(humid) || isnan(temp))
+    if (disable == true) //checks if disable button is pressed
     {
-        Serial.println("no reading from DHT");
-        return;
+        *port_b |= 0x20; //lights up yellow LED
+        *port_b &= 0x2F; //!yellow LED off 0b0010 1111
     }
-    
-    //water sensor
-    unsigned int adc_reading = adc_read(adc_id); //for now gets reading from ADC
-    if(((Historyvalue>=adc_reading) && ((Historyvalue - adc_reading) > 10)) || ((Historyvalue<adc_reading) && ((adc_reading - Historyvalue) > 10)))
+    else
     {
-      sprintf(printBuffer,"ADC%d level is %d\n",adc_id, adc_reading);
-      Serial.print(printBuffer);
-      Historyvalue = adc_reading;
-    }
-
-    idlestate();
-
-    //LCD code
-    lcd.setCursor (0,0); //row 1
-    lcd.print("Temp: ");
-    lcd.print(temp); //prints temperature
-    lcd.print((char)223);
-    lcd.print("F");
+        //dht sensor - maybe turn into function?
+        humid = dht.readHumidity(); //reads humidity
+        temp = dht.readTemperature(true); //reads temp in F
+        if(isnan(humid) || isnan(temp))
+        {
+            Serial.println("no reading from DHT");
+            return;
+        }
     
-    lcd.setCursor (0,1); //row 2
-    lcd.print("Humidity: ");
-    lcd.print(humid); //prints humidity
-    lcd.print("%");
+        //water sensor - function again?
+        adc_reading = adc_read(adc_id); //for now gets reading from ADC
+        if(((Historyvalue>=adc_reading) && ((Historyvalue - adc_reading) > 10)) || ((Historyvalue<adc_reading) && ((adc_reading - Historyvalue) > 10)))
+        {
+            sprintf(printBuffer,"ADC%d level is %d\n",adc_id, adc_reading);
+            Serial.print(printBuffer);
+            Historyvalue = adc_reading;
+        }
+
+        //LCD code
+        lcd.setCursor (0,0); //row 1
+        lcd.print("Temp: ");
+        lcd.print(temp); //prints temperature
+        lcd.print((char)223);
+        lcd.print("F");
+    
+        lcd.setCursor (0,1); //row 2
+        lcd.print("Humidity: ");
+        lcd.print(humid); //prints humidity
+        lcd.print("%");
+    }
 }
 
 //functions
@@ -163,4 +186,32 @@ void runningstate()
         //transition to idlestate when temp < threshold
     //monitor water level
         //transition to errorstate when water level too low
+}
+
+//interrupt functions
+void venton() //ISR function when vent button is pressed
+{
+    unsigned int lastint = 0; //starting point
+    unsigned int newint = millis(); //records new point
+
+    if (newint - lastint > 200) //debounces!
+    {
+        myservo.write(90*bpress);// moves servo by 90 degrees each vent button press
+        bpress++;
+        if (bpress == 3) //change to needed number later
+        {
+            bpress = 0; //servo/vent will move back to beginning next vent button press
+        }
+    }
+}
+
+void disabled() //ISR function when disabled button pressed
+{
+    unsigned int lastint = 0; //starting point
+    unsigned int newint = millis(); //records new point
+
+    if (newint - lastint > 200) //debounces!
+    {
+        disable = !disable;
+    }
 }
