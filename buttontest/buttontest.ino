@@ -3,7 +3,7 @@
 
 #include <Servo.h> //servo library
 Servo myservo; //sets up servo
-unsigned int bpress = 0;
+unsigned int bpress = 1;
 
 //pointers for port b to light up LEDs and for motor - 
 volatile unsigned char *port_b = (unsigned char*) 0x25;
@@ -18,6 +18,8 @@ volatile unsigned char *pin_e = (unsigned char*) 0x2C;
 unsigned int ventpin = 2; //pin vent button
 unsigned int dispin = 3; //pin disable button
 
+bool disable = false;
+
 void setup() {
     // put your setup code here, to run once:
     myservo.attach(51); //servo connected to pin 51
@@ -27,39 +29,31 @@ void setup() {
     *port_b &= 0xF5; //sets PB1 and PB3 to low
     *ddr_b |= 0xF2; //sets LEDs as outputs
     *port_b &= 0x0F; //sets LEDs to low
-    *ddr_b &= 0xFD; //sets PE5 as input
-    *port_e |= 0x10; //sets PE5 high
+    *ddr_e &= 0xFD; //sets PE5 as input
+    *port_e &= 0xEF; //sets LEDs to low
 
     attachInterrupt(digitalPinToInterrupt(ventpin), venton, RISING); //pull-down resistor
-    //attachInterrupt(digitalPinToInterrupt(dispin), disabled, LOW); //pull-up resistor
+    attachInterrupt(digitalPinToInterrupt(dispin), disabled, CHANGE); //pull-down resistor
 }
 
 void loop() {
     // put your main code here, to run repeatedly:
-    
-    while (!(*pin_e & 0x10))
+
+    if (disable == true)
     {
         *port_b |= 0x20; //lights up yellow LED
-        *port_b &= 0xBF; //green LED off
-        *port_b &= 0xEF; //red LED off
+        *port_b |= 0x80; //lights up blue LED
+        *port_b &= 0x2F; //!yellow LED off 0b0010 1111
+        //while(!(*pin_e & 0x10));
+        //while(disable == true);
     }
-    
-    *port_b |= 0x10; //lights up red LED
-    *port_b &= 0xDF; //yellow LED off
-    /*
-    if((*pin_b & 0x02)) //if enable button pressed
+    else
     {
         *port_b |= 0x40; //lights up green LED
-        *port_b &= 0xEF; //red LED off
-        *port_b &= 0xDF; //yellow LED off
+        *port_b |= 0x10; //RED
+        //*port_b &= 0x4F; //!green LED off 0b0100 1111
+        *port_b &= 0x5F; //0b0101
     }
-    else //buttons not pressed
-    {
-        *port_b |= 0x10; //lights up red LED
-        *port_b &= 0xBF; //green LED off
-        *port_b &= 0xDF; //yellow LED off
-    }*/
-
 }
 
 void venton() //ISR function when vent button is pressed
@@ -78,11 +72,9 @@ void venton() //ISR function when vent button is pressed
 
 void disabled() //ISR function when disabled button pressed
 {
-    *port_b |= 0x20; //lights up yellow LED
-    *port_b &= 0xBF; //green LED off
-    *port_b &= 0xEF; //red LED off
-    
-    while (!(*pin_e & 0x10)); //stays in interrupt until disabled button not pressed
-    //need to fix this, unable to move vent in this state
-    //maybe change this to a while loop in the main?
+    disable = !disable;
+
+    //figure out debouncing code
+    //getticks
+    //getcount
 }
