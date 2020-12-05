@@ -4,10 +4,7 @@
 //(Evaporation Cooler Simulation)
 //Written by Susu Pelger, Fall 2020
 
-
-//add time and date part - using DS1307
-
-
+//LIBRARIES
 //LCD library
 #include <LiquidCrystal.h>
 LiquidCrystal lcd(23, 24, 25, 26, 27, 28); //(RS, E, D4, D5, D6, D7) initializes LCD screen
@@ -18,14 +15,32 @@ LiquidCrystal lcd(23, 24, 25, 26, 27, 28); //(RS, E, D4, D5, D6, D7) initializes
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE); //initializes DHT sensor
 
-//DHT variables
-float humid = 0;
-float temp = 0;
-
 //Servo library
 #include <Servo.h>
 Servo myservo; //sets up servo
 unsigned int bpress = 1;
+
+//REGISTER POINTERS
+//pointers for ADC
+volatile unsigned char *my_ADMUX = (unsigned char*) 0x7C;
+volatile unsigned char *my_ADCSRB = (unsigned char*) 0x7B;
+volatile unsigned char *my_ADCSRA = (unsigned char*) 0x7A;
+volatile unsigned int *my_ADC_DATA = (unsigned int*) 0x78;
+
+//pointers for port b to light up LEDs
+volatile unsigned char *port_b = (unsigned char*) 0x25;
+volatile unsigned char *ddr_b = (unsigned char*) 0x24;
+volatile unsigned char *pin_b = (unsigned char*) 0x23;
+
+//pointers for port h for DC motor
+volatile unsigned char *port_h = (unsigned char*) 0x102;
+volatile unsigned char *ddr_h = (unsigned char*) 0x101;
+volatile unsigned char *pin_h = (unsigned char*) 0x100;
+
+//VARIABLES
+//DHT variables
+float humid = 0;
+float temp = 0;
 
 //interrupt variables
 unsigned int ventpin = 2; //pin vent button
@@ -33,18 +48,7 @@ unsigned int dispin = 3; //pin disable button
 
 //temperature and water levels
 unsigned int watermin = 150; //minimum water level is 150
-float tempmax = 73.00; //maximum temperature is 73.00 degrees F
-
-//pointers for ADC
-volatile unsigned char *my_ADMUX = (unsigned char*) 0x7C;
-volatile unsigned char *my_ADCSRB = (unsigned char*) 0x7B;
-volatile unsigned char *my_ADCSRA = (unsigned char*) 0x7A;
-volatile unsigned int *my_ADC_DATA = (unsigned int*) 0x78;
-
-//pointers for port b to light up LEDs and for motor - 
-volatile unsigned char *port_b = (unsigned char*) 0x25;
-volatile unsigned char *ddr_b = (unsigned char*) 0x24;
-volatile unsigned char *pin_b = (unsigned char*) 0x23;
+float tempmax = 75.00; //maximum temperature is 75.00 degrees F
 
 //adc vars
 int adc_id = 0;
@@ -62,13 +66,12 @@ void setup()
     adc_init(); //sets up ADC
     lcd.begin(16, 2); //sets up LCD columns and rows
     dht.begin(); //sets up dht sensor
-    *ddr_b |= 0xF1; //sets PB0 (motor) and 4-7 (LEDs) outputs
-    *port_b &= 0x0E; //sets LEDs and motor to low for now
+    *ddr_b |= 0xF0; //sets 4-7 (LEDs) outputs
+    *port_b &= 0x0F; //sets LEDs to low for now
+    *ddr_h |= 0x18; //sets PB3 and PB4 to outputs (motor)
 
     myservo.attach(51); //servo connected to pin 51
     myservo.write(0); //servo set at 0°
-    *ddr_b &= 0xFD; //sets PB1 (enable button) and PB3 (vent button) to input
-    *port_b &= 0xF5; //sets PB1 and PB3 to low
 
     attachInterrupt(digitalPinToInterrupt(ventpin), venton, RISING); //pull-down resistor
     attachInterrupt(digitalPinToInterrupt(dispin), disabled, CHANGE); //pull-down resistor
@@ -80,7 +83,8 @@ void loop()
     {
         *port_b |= 0x20; //lights up yellow LED
         *port_b &= 0x2F; //!yellow LED off
-        *port_b &= 0xFE; //turns fan motor off
+        *port_h &= 0xEF; //turns fan motor off (enable off)
+
     }
     else //otherwise
     {
@@ -96,7 +100,7 @@ void loop()
             //errorstate();
             *port_b |= 0x10; //lights up red LED
             *port_b &= 0x1F; //!red LED off
-            *port_b &= 0xFE; //turns fan motor off
+            *port_h &= 0xEF; //turns fan motor off (enable off)
     
             //error message displayed on LCD
             if (lcdclr == true)
@@ -117,7 +121,9 @@ void loop()
             
             *port_b |= 0x80; //lights up blue LED
             *port_b &= 0x8F; //!blue LED off
-            *port_b |= 0x01; //turns fan motor on
+            //turns fan motor on
+            *port_h |= 0x10; //turns enable on
+            *port_h |= 0x08; //turns motor on
         }
         else //goes into idle state
         {
@@ -125,12 +131,12 @@ void loop()
             lcdclr = true;
             *port_b |= 0x40; //lights up green LED
             *port_b &= 0x4F; //!green LED off
-            *port_b &= 0xFE; //turns fan motor off
+            *port_h &= 0xEF; //turns fan motor off (enable off)
         }
     }
 }
 
-//functions
+//FUNCTIONS
 //sets up registers for ADC
 void adc_init()
 {
@@ -204,7 +210,7 @@ void lcdth()
     lcd.print("%");
 }
 
-//interrupt functions
+//INTERRUPTS
 void venton() //ISR function when vent button is pressed
 {
     unsigned int lastint = 0; //starting point
