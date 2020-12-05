@@ -5,10 +5,7 @@
 //Written by Susu Pelger, Fall 2020
 
 
-
-//start creating if statements in loop to check for which state im in
 //add time and date part - using DS1307
-
 
 
 //LCD library
@@ -33,7 +30,10 @@ unsigned int bpress = 1;
 //interrupt variables
 unsigned int ventpin = 2; //pin vent button
 unsigned int dispin = 3; //pin disable button
-bool disable = false;
+
+//temperature and water levels
+unsigned int watermin = 150; //minimum water level is 150
+float tempmax = 73.00; //maximum temperature is 73.00 degrees F
 
 //pointers for ADC
 volatile unsigned char *my_ADMUX = (unsigned char*) 0x7C;
@@ -51,6 +51,10 @@ int adc_id = 0;
 int Historyvalue = 0;
 char printBuffer[128];
 unsigned int adc_reading = 0;
+
+//state variables
+bool disable = false;
+bool lcdclr = false;
 
 void setup()
 {
@@ -72,42 +76,57 @@ void setup()
 
 void loop()
 {
-    if (disable == true) //checks if disable button is pressed
+    if (disable == true) //first checks if disable button is pressed
     {
         *port_b |= 0x20; //lights up yellow LED
-        *port_b &= 0x2F; //!yellow LED off 0b0010 1111
+        *port_b &= 0x2F; //!yellow LED off
+        *port_b &= 0xFE; //turns fan motor off
     }
-    else
+    else //otherwise
     {
-        //dht sensor - maybe turn into function?
-        humid = dht.readHumidity(); //reads humidity
-        temp = dht.readTemperature(true); //reads temp in F
-        if(isnan(humid) || isnan(temp))
-        {
-            Serial.println("no reading from DHT");
-            return;
-        }
-    
-        //water sensor - function again?
-        adc_reading = adc_read(adc_id); //for now gets reading from ADC
-        if(((Historyvalue>=adc_reading) && ((Historyvalue - adc_reading) > 10)) || ((Historyvalue<adc_reading) && ((adc_reading - Historyvalue) > 10)))
-        {
-            sprintf(printBuffer,"ADC%d level is %d\n",adc_id, adc_reading);
-            Serial.print(printBuffer);
-            Historyvalue = adc_reading;
-        }
+        *port_b &= 0xDF; //yellow LED off
+        
+        //first read sensors, then use readings to decide what state
+        dhtsense(); //reads dht
+        watersense(); //reads water sensor
 
-        //LCD code
-        lcd.setCursor (0,0); //row 1
-        lcd.print("Temp: ");
-        lcd.print(temp); //prints temperature
-        lcd.print((char)223);
-        lcd.print("F");
+        //check for other states
+        if (adc_reading < watermin) //if water level is too low, goes into error state
+        {
+            //errorstate();
+            *port_b |= 0x10; //lights up red LED
+            *port_b &= 0x1F; //!red LED off
+            *port_b &= 0xFE; //turns fan motor off
     
-        lcd.setCursor (0,1); //row 2
-        lcd.print("Humidity: ");
-        lcd.print(humid); //prints humidity
-        lcd.print("%");
+            //error message displayed on LCD
+            if (lcdclr == true)
+                {
+                    lcd.clear(); //clears if temp and humidity were showing
+                    lcdclr = false;
+                }
+            lcd.setCursor (0,0); //row 1
+            lcd.print("ERROR: REFILL");
+   
+            lcd.setCursor (0,1); //row 2
+            lcd.print("WATER LEVEL");
+        }
+        else if (temp > tempmax) //if temp is too high, goes into running state
+        {
+            lcdth(); //prints temperature and humidity on LCD screen
+            lcdclr = true;
+            
+            *port_b |= 0x80; //lights up blue LED
+            *port_b &= 0x8F; //!blue LED off
+            *port_b |= 0x01; //turns fan motor on
+        }
+        else //goes into idle state
+        {
+            lcdth(); //prints temperature and humidity on LCD screen
+            lcdclr = true;
+            *port_b |= 0x40; //lights up green LED
+            *port_b &= 0x4F; //!green LED off
+            *port_b &= 0xFE; //turns fan motor off
+        }
     }
 }
 
@@ -146,46 +165,43 @@ unsigned int adc_read(unsigned char adc_channel)
     return *my_ADC_DATA; //return result in ADC data register
 }
 
-//base line code for states
-void disabledstate()
+//DHT reading
+void dhtsense()
 {
-    *port_b |= 0x20; //lights up yellow LED
-    //no monitoring of water
+    humid = dht.readHumidity(); //reads humidity
+    temp = dht.readTemperature(true); //reads temp in F
+    if(isnan(humid) || isnan(temp)) //if the DHT doesn't receive readings, will send error
+    {
+        Serial.println("no reading from DHT");
+        return;
+    }
 }
 
-void idlestate()
+//water sensor reading
+void watersense()
 {
-    *port_b |= 0x40; //lights up green LED
-    //monitor temp
-        //when temp > threshold, go to runningstate
-    //time stamp to record transition times
-    //monitor water level
-        //go to errorstate if too low
+    adc_reading = adc_read(adc_id); //for now gets reading from ADC
+    if(((Historyvalue>=adc_reading) && ((Historyvalue - adc_reading) > 10)) || ((Historyvalue<adc_reading) && ((adc_reading - Historyvalue) > 10)))
+    {
+        sprintf(printBuffer,"ADC%d level is %d\n",adc_id, adc_reading);
+        Serial.print(printBuffer);
+        Historyvalue = adc_reading;
+    }
 }
 
-void errorstate ()
+//LCD screen, prints temp and humidity
+void lcdth()
 {
-    *port_b |= 0x10; //lights up red LED
-    *port_b &= 0xFE; //turns fan motor off
-    //monitor temp
-    //monitor water level
-        //transition to idlestate when water is at good level
-    //error message displayed on LCD
     lcd.setCursor (0,0); //row 1
-    lcd.print("ERROR: REFILL");
-   
+    lcd.print("Temp: ");
+    lcd.print(temp); //prints temperature
+    lcd.print((char)223);
+    lcd.print("F");
+    
     lcd.setCursor (0,1); //row 2
-    lcd.print("WATER LEVEL");
-}
-
-void runningstate()
-{
-    *port_b |= 0x80; //lights up blue LED
-    *port_b |= 0x01; //turns fan motor on
-    //monitor temp
-        //transition to idlestate when temp < threshold
-    //monitor water level
-        //transition to errorstate when water level too low
+    lcd.print("Humidity: ");
+    lcd.print(humid); //prints humidity
+    lcd.print("%");
 }
 
 //interrupt functions
