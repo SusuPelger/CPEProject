@@ -12,6 +12,12 @@ void setup() {
     Serial.begin(9600);
     Serial.println("Initialize RTC module");
     Wire.begin();
+
+    //only run this once to set time correctly
+    //clock.setDate(5);
+    //clock.setHour(16);
+    //clock.setMinute(17);
+    //clock.setSecond(20);
 }
 
 void loop() {
@@ -20,7 +26,7 @@ void loop() {
 
     DateTime mtime = myRTC.now();
     
-    Serial.print(mtime.year(), DEC);
+    Serial.print(mtime.year());
     Serial.print('/');
     Serial.print(mtime.month(), DEC);
     Serial.print('/');
