@@ -20,6 +20,10 @@ DHT dht(DHTPIN, DHTTYPE); //initializes DHT sensor
 Servo myservo; //sets up servo
 unsigned int bpress = 1;
 
+//Clock libraries
+#include <Wire.h> //allows communication with SDA and SCL pins
+#include <DS3231.h> //RTC library
+
 //REGISTER POINTERS
 //pointers for ADC
 volatile unsigned char *my_ADMUX = (unsigned char*) 0x7C;
@@ -59,6 +63,11 @@ unsigned int adc_reading = 0;
 //state variables
 bool disable = false;
 bool lcdclr = false;
+bool fanon = false;
+
+//clock variables
+DS3231 clock;
+RTClib myRTC;
 
 void setup()
 {
@@ -66,9 +75,11 @@ void setup()
     adc_init(); //sets up ADC
     lcd.begin(16, 2); //sets up LCD columns and rows
     dht.begin(); //sets up dht sensor
+    Wire.begin(); //sets up clock pins
     *ddr_b |= 0xF0; //sets 4-7 (LEDs) outputs
     *port_b &= 0x0F; //sets LEDs to low for now
     *ddr_h |= 0x18; //sets PB3 and PB4 to outputs (motor)
+    *port_h &= 0xE7; //sets motor to low
 
     myservo.attach(51); //servo connected to pin 51
     myservo.write(0); //servo set at 0°
@@ -83,7 +94,12 @@ void loop()
     {
         *port_b |= 0x20; //lights up yellow LED
         *port_b &= 0x2F; //!yellow LED off
-        *port_h &= 0xEF; //turns fan motor off (enable off)
+        if ((*pin_h & 0x10))
+            {
+                timeoff(); //prints time if motor is turned off
+                *port_h &= 0xEF; //turns fan motor off (enable off)
+            }
+        //*port_h &= 0xEF; //turns fan motor off (enable off)
 
     }
     else //otherwise
@@ -100,7 +116,12 @@ void loop()
             //errorstate();
             *port_b |= 0x10; //lights up red LED
             *port_b &= 0x1F; //!red LED off
-            *port_h &= 0xEF; //turns fan motor off (enable off)
+            if ((*pin_h & 0x10))
+            {
+                timeoff(); //prints time if motor is turned off
+                *port_h &= 0xEF; //turns fan motor off (enable off)
+            }
+            //*port_h &= 0xEF; //turns fan motor off (enable off)
     
             //error message displayed on LCD
             if (lcdclr == true)
@@ -124,6 +145,10 @@ void loop()
             //turns fan motor on
             *port_h |= 0x10; //turns enable on
             *port_h |= 0x08; //turns motor on
+            if (fanon == false)
+            {
+                timeon();
+            }
         }
         else //goes into idle state
         {
@@ -131,7 +156,12 @@ void loop()
             lcdclr = true;
             *port_b |= 0x40; //lights up green LED
             *port_b &= 0x4F; //!green LED off
-            *port_h &= 0xEF; //turns fan motor off (enable off)
+            if ((*pin_h & 0x10))
+            {
+                timeoff(); //prints time if motor is turned off
+                *port_h &= 0xEF; //turns fan motor off (enable off)
+            }
+            //*port_h &= 0xEF; //turns fan motor off (enable off)
         }
     }
 }
@@ -210,13 +240,55 @@ void lcdth()
     lcd.print("%");
 }
 
+//prints time when fan turned on
+void timeon()
+{
+    fanon = true;
+    DateTime now = myRTC.now();
+    
+    Serial.print("Fan on at Date: ");
+    Serial.print(now.year()); //prints year
+    Serial.print('/');
+    Serial.print(now.month()); //prints month
+    Serial.print('/');
+    Serial.print(now.day()); //prints day
+    Serial.print(" Time: ");
+    Serial.print(now.hour()); //prints hour
+    Serial.print(':');
+    Serial.print(now.minute()); //prints minute
+    Serial.print(':');
+    Serial.print(now.second()); //prints second
+    Serial.println();
+}
+
+//prints time when fan turned off
+void timeoff()
+{
+    fanon = false;
+    DateTime now = myRTC.now();
+    
+    Serial.print("Fan off at Date: ");
+    Serial.print(now.year()); //prints year
+    Serial.print('/');
+    Serial.print(now.month()); //prints month
+    Serial.print('/');
+    Serial.print(now.day()); //prints day
+    Serial.print(" Time: ");
+    Serial.print(now.hour()); //prints hour
+    Serial.print(':');
+    Serial.print(now.minute()); //prints minute
+    Serial.print(':');
+    Serial.print(now.second()); //prints second
+    Serial.println();
+}
+
 //INTERRUPTS
 void venton() //ISR function when vent button is pressed
 {
     unsigned int lastint = 0; //starting point
     unsigned int newint = millis(); //records new point
 
-    if (newint - lastint > 200) //debounces!
+    if (newint - lastint > 200) //debounces - checks for noise
     {
         myservo.write(90*bpress);// moves servo by 90 degrees each vent button press
         bpress++;
@@ -232,7 +304,7 @@ void disabled() //ISR function when disabled button pressed
     unsigned int lastint = 0; //starting point
     unsigned int newint = millis(); //records new point
 
-    if (newint - lastint > 200) //debounces!
+    if (newint - lastint > 200) //debounces - checks for noise
     {
         disable = !disable;
     }
