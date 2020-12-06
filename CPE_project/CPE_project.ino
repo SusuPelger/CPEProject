@@ -52,7 +52,7 @@ unsigned int dispin = 3; //pin disable button
 
 //temperature and water levels
 unsigned int watermin = 150; //minimum water level is 150
-float tempmax = 75.00; //maximum temperature is 75.00 degrees F
+float tempmax = 76.00; //maximum temperature is 76.00 degrees F
 
 //adc vars
 int adc_id = 0;
@@ -64,6 +64,10 @@ unsigned int adc_reading = 0;
 bool disable = false;
 bool lcdclr = false;
 bool fanon = false;
+
+//button variables
+unsigned int ventlastint = 0; //starting point for vent button
+unsigned int dislastint = 0; //starting point for disable button
 
 //clock variables
 DS3231 clock;
@@ -85,7 +89,7 @@ void setup()
     myservo.write(0); //servo set at 0°
 
     attachInterrupt(digitalPinToInterrupt(ventpin), venton, RISING); //pull-down resistor
-    attachInterrupt(digitalPinToInterrupt(dispin), disabled, CHANGE); //pull-down resistor
+    attachInterrupt(digitalPinToInterrupt(dispin), toggle, RISING); //pull-down resistor
 }
 
 void loop()
@@ -99,12 +103,10 @@ void loop()
                 timeoff(); //prints time if motor is turned off
                 *port_h &= 0xEF; //turns fan motor off (enable off)
             }
-        //*port_h &= 0xEF; //turns fan motor off (enable off)
-
     }
-    else //otherwise
+    else //otherwise checks for other states
     {
-        *port_b &= 0xDF; //yellow LED off
+        //*port_b &= 0xDF; //yellow LED off
         
         //first read sensors, then use readings to decide what state
         dhtsense(); //reads dht
@@ -121,7 +123,6 @@ void loop()
                 timeoff(); //prints time if motor is turned off
                 *port_h &= 0xEF; //turns fan motor off (enable off)
             }
-            //*port_h &= 0xEF; //turns fan motor off (enable off)
     
             //error message displayed on LCD
             if (lcdclr == true)
@@ -161,7 +162,6 @@ void loop()
                 timeoff(); //prints time if motor is turned off
                 *port_h &= 0xEF; //turns fan motor off (enable off)
             }
-            //*port_h &= 0xEF; //turns fan motor off (enable off)
         }
     }
 }
@@ -206,11 +206,6 @@ void dhtsense()
 {
     humid = dht.readHumidity(); //reads humidity
     temp = dht.readTemperature(true); //reads temp in F
-    if(isnan(humid) || isnan(temp)) //if the DHT doesn't receive readings, will send error
-    {
-        Serial.println("no reading from DHT");
-        return;
-    }
 }
 
 //water sensor reading
@@ -219,8 +214,6 @@ void watersense()
     adc_reading = adc_read(adc_id); //for now gets reading from ADC
     if(((Historyvalue>=adc_reading) && ((Historyvalue - adc_reading) > 10)) || ((Historyvalue<adc_reading) && ((adc_reading - Historyvalue) > 10)))
     {
-        sprintf(printBuffer,"ADC%d level is %d\n",adc_id, adc_reading);
-        Serial.print(printBuffer);
         Historyvalue = adc_reading;
     }
 }
@@ -285,27 +278,27 @@ void timeoff()
 //INTERRUPTS
 void venton() //ISR function when vent button is pressed
 {
-    unsigned int lastint = 0; //starting point
     unsigned int newint = millis(); //records new point
 
-    if (newint - lastint > 200) //debounces - checks for noise
+    if (newint - ventlastint > 200) //debounces - checks for noise
     {
-        myservo.write(90*bpress);// moves servo by 90 degrees each vent button press
+        myservo.write(45*bpress);// moves servo by 45 degrees each vent button press
         bpress++;
-        if (bpress == 3) //change to needed number later
+        if (bpress == 5) //change to needed number later
         {
             bpress = 0; //servo/vent will move back to beginning next vent button press
         }
     }
+    ventlastint = newint;
 }
 
-void disabled() //ISR function when disabled button pressed
+void toggle() //ISR function when disabled button pressed
 {
-    unsigned int lastint = 0; //starting point
     unsigned int newint = millis(); //records new point
 
-    if (newint - lastint > 200) //debounces - checks for noise
+    if (newint - dislastint > 200) //debounces - checks for noise
     {
         disable = !disable;
     }
+    dislastint = newint;
 }
