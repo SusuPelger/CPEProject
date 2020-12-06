@@ -82,7 +82,7 @@ void setup()
     Wire.begin(); //sets up clock pins
     *ddr_b |= 0xF0; //sets 4-7 (LEDs) outputs
     *port_b &= 0x0F; //sets LEDs to low for now
-    *ddr_h |= 0x18; //sets PB3 and PB4 to outputs (motor)
+    *ddr_h |= 0x18; //sets PH3 and PH4 to outputs (motor)
     *port_h &= 0xE7; //sets motor to low
 
     myservo.attach(51); //servo connected to pin 51
@@ -106,8 +106,6 @@ void loop()
     }
     else //otherwise checks for other states
     {
-        //*port_b &= 0xDF; //yellow LED off
-        
         //first read sensors, then use readings to decide what state
         dhtsense(); //reads dht
         watersense(); //reads water sensor
@@ -288,8 +286,8 @@ void venton() //ISR function when vent button is pressed
         {
             bpress = 0; //servo/vent will move back to beginning next vent button press
         }
+        ventlastint = newint;
     }
-    ventlastint = newint;
 }
 
 void toggle() //ISR function when disabled button pressed
@@ -299,6 +297,6 @@ void toggle() //ISR function when disabled button pressed
     if (newint - dislastint > 200) //debounces - checks for noise
     {
         disable = !disable;
+        dislastint = newint;
     }
-    dislastint = newint;
 }
