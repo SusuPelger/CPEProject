@@ -24,18 +24,19 @@ void loop() {
     // put your main code here, to run repeatedly:
     delay(1000);
 
-    DateTime mtime = myRTC.now();
+    DateTime now = myRTC.now();
     
-    Serial.print(mtime.year());
+    Serial.print("Fan turned on at Date: ");
+    Serial.print(now.year());
     Serial.print('/');
-    Serial.print(mtime.month(), DEC);
+    Serial.print(now.month());
     Serial.print('/');
-    Serial.print(mtime.day(), DEC);
-    Serial.print(' ');
-    Serial.print(mtime.hour(), DEC);
+    Serial.print(now.day());
+    Serial.print(" Time: ");
+    Serial.print(now.hour());
     Serial.print(':');
-    Serial.print(mtime.minute(), DEC);
+    Serial.print(now.minute());
     Serial.print(':');
-    Serial.print(mtime.second(), DEC);
+    Serial.print(now.second());
     Serial.println();
 }
