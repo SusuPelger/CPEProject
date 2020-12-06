@@ -26,7 +26,7 @@ void loop() {
 
     DateTime now = myRTC.now();
     
-    Serial.print("Fan turned on at Date: ");
+    Serial.print("Fan on at Date: ");
     Serial.print(now.year());
     Serial.print('/');
     Serial.print(now.month());
