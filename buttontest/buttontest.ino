@@ -15,18 +15,19 @@ unsigned int dispin = 3; //pin disable button
 
 bool disable = false;
 
+unsigned int ventlastint = 0; //starting point for vent button
+unsigned int dislastint = 0; //starting point for disable button
+
 void setup() {
     // put your setup code here, to run once:
     myservo.attach(51); //servo connected to pin 51
     myservo.write(0); //servo set at 0°
     
-    *ddr_b &= 0xFD; //sets PB1 (enable button) and PB3 (vent button) to input
-    *port_b &= 0xF5; //sets PB1 and PB3 to low
     *ddr_b |= 0xF2; //sets LEDs as outputs
     *port_b &= 0x0F; //sets LEDs to low
 
     attachInterrupt(digitalPinToInterrupt(ventpin), venton, RISING); //pull-down resistor
-    attachInterrupt(digitalPinToInterrupt(dispin), disabled, CHANGE); //pull-down resistor
+    attachInterrupt(digitalPinToInterrupt(dispin), toggle, RISING); //pull-down resistor
 }
 
 void loop() {
@@ -49,10 +50,9 @@ void loop() {
 
 void venton() //ISR function when vent button is pressed
 {
-    unsigned int lastint = 0; //starting point
     unsigned int newint = millis(); //records new point
 
-    if (newint - lastint > 200) //debounces!
+    if (newint - ventlastint > 200) //debounces!
     {
         myservo.write(90*bpress);// moves servo by 90 degrees each vent button press
         bpress++;
@@ -60,17 +60,17 @@ void venton() //ISR function when vent button is pressed
         {
             bpress = 0; //servo/vent will move back to beginning next vent button press
         }
+        ventlastint = newint;
     }
-
 }
 
-void disabled() //ISR function when disabled button pressed
+void toggle() //ISR function when disabled button pressed
 {
-    unsigned int lastint = 0; //starting point
     unsigned int newint = millis(); //records new point
 
-    if (newint - lastint > 200) //debounces!
+    if (newint - dislastint > 200)
     {
         disable = !disable;
     }
+    dislastint = newint;
 }
